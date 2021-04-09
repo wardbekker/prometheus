@@ -2126,7 +2126,7 @@ func (ev *evaluator) aggregation(op parser.ItemType, grouping []string, without 
 
 	result := map[uint64]*groupedAggregation{}
 	var k int64
-	if op == parser.TOPK || op == parser.BOTTOMK {
+	if op == parser.TOPK || op == parser.BOTTOMK || op == parser.WTOPK {
 		f := param.(float64)
 		if !convertibleToInt64(f) {
 			ev.errorf("Scalar value %v overflows int64", f)
@@ -2216,7 +2216,7 @@ func (ev *evaluator) aggregation(op parser.ItemType, grouping []string, without 
 			switch op {
 			case parser.STDVAR, parser.STDDEV:
 				result[groupingKey].value = 0
-			case parser.TOPK, parser.QUANTILE:
+			case parser.TOPK, parser.WTOPK, parser.QUANTILE:
 				result[groupingKey].heap = make(vectorByValueHeap, 0, resultSize)
 				heap.Push(&result[groupingKey].heap, &Sample{
 					Point:  Point{V: s.V},
@@ -2293,6 +2293,17 @@ func (ev *evaluator) aggregation(op parser.ItemType, grouping []string, without 
 				})
 			}
 
+		case parser.WTOPK:
+			if int64(len(group.heap)) < k || group.heap[0].V < s.V || math.IsNaN(group.heap[0].V) {
+				if int64(len(group.heap)) == k {
+					heap.Pop(&group.heap)
+				}
+				heap.Push(&group.heap, &Sample{
+					Point:  Point{V: s.V},
+					Metric: s.Metric,
+				})
+			}
+
 		case parser.BOTTOMK:
 			if int64(len(group.reverseHeap)) < k || group.reverseHeap[0].V > s.V || math.IsNaN(group.reverseHeap[0].V) {
 				if int64(len(group.reverseHeap)) == k {
@@ -2328,6 +2339,17 @@ func (ev *evaluator) aggregation(op parser.ItemType, grouping []string, without 
 			aggr.value = math.Sqrt(aggr.value / float64(aggr.groupCount))
 
 		case parser.TOPK:
+			// The heap keeps the lowest value on top, so reverse it.
+			sort.Sort(sort.Reverse(aggr.heap))
+			for _, v := range aggr.heap {
+				enh.Out = append(enh.Out, Sample{
+					Metric: v.Metric,
+					Point:  Point{V: v.V},
+				})
+			}
+			continue // Bypass default append.
+
+		case parser.WTOPK:
 			// The heap keeps the lowest value on top, so reverse it.
 			sort.Sort(sort.Reverse(aggr.heap))
 			for _, v := range aggr.heap {

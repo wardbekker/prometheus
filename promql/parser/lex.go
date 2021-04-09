@@ -59,7 +59,7 @@ func (i ItemType) IsAggregator() bool { return i > aggregatorsStart && i < aggre
 // IsAggregatorWithParam returns true if the Item is an aggregator that takes a parameter.
 // Returns false otherwise
 func (i ItemType) IsAggregatorWithParam() bool {
-	return i == TOPK || i == BOTTOMK || i == COUNT_VALUES || i == QUANTILE
+	return i == TOPK || i == WTOPK || i == BOTTOMK || i == COUNT_VALUES || i == QUANTILE
 }
 
 // IsKeyword returns true if the Item corresponds to a keyword.
@@ -108,6 +108,7 @@ var key = map[string]ItemType{
 	"stddev":       STDDEV,
 	"stdvar":       STDVAR,
 	"topk":         TOPK,
+	"wtopk":        WTOPK,
 	"bottomk":      BOTTOMK,
 	"count_values": COUNT_VALUES,
 	"quantile":     QUANTILE,
